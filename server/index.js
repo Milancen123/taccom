@@ -5,10 +5,62 @@ const bcrypt = require("bcrypt");
 const { Pool } = require('pg');
 const authenticateToken = require("./middlewares/authMiddleware.js");
 require("dotenv").config();
+const http = require("http");
+const { Server } = require("socket.io");
+
+
 
 const app = express();
 app.use(express.json());
 app.use(cors()); // Allow frontend requests
+const server = http.createServer(app);
+
+
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000", // Allow Next.js frontend
+    methods: ["GET", "POST"],
+  },
+})
+
+// Store messages per channel
+const chatRooms = {};
+
+io.on("connection", (socket) => {
+  console.log(`User connected: ${socket.id}`);
+
+  // User joins a chat channel
+  socket.on("joinChannel", (channelName) => {
+    socket.join(channelName);
+    console.log(`User ${socket.id} joined ${channelName}`);
+
+    // Send chat history for the channel
+    if (chatRooms[channelName]) {
+      socket.emit("chatHistory", chatRooms[channelName]);
+    } else {
+      chatRooms[channelName] = []; // Initialize if empty
+    }
+  });
+
+  // Handle incoming messages
+  socket.on("sendMessage", ({ channelName, message, sender, timestamp }) => {
+    const chatMessage = { sender, message, timestamp, channelName };
+
+    // Store message in the correct channel
+    if (!chatRooms[channelName]) {
+      chatRooms[channelName] = [];
+    }
+    chatRooms[channelName].push(chatMessage);
+
+    // Broadcast only to users in the same channel
+    io.to(channelName).emit("receiveMessage", chatMessage);
+  });
+
+  // Handle user disconnect
+  socket.on("disconnect", () => {
+    console.log(`User disconnected: ${socket.id}`);
+  });
+});
 
 // PostgreSQL connection pool
 const pool = new Pool({
@@ -56,4 +108,4 @@ app.get("/api/protected", authenticateToken, (req, res) => {
 
 
 
-app.listen(5000, () => console.log("Auth Server running on port 5000"));
+server.listen(5000, () => console.log("Auth Server running on port 5000"));

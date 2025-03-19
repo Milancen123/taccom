@@ -18,8 +18,15 @@ import { z } from "zod"
 import axios from "axios";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Terminal } from 'lucide-react'
-import { SignedIn } from '@/components/authentication/SignedIn'
 import { useRouter } from "next/navigation";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp"
+
+
 
 const formSchema = z.object({
   username: z
@@ -41,6 +48,8 @@ const formSchema = z.object({
     .length(6, "Daily access code must be exactly 6 digits")
     .regex(/^\d+$/, "Daily access code must only contain numbers"),
 });
+
+
 
 
 const page = () => {
@@ -65,7 +74,7 @@ const page = () => {
       try{
         console.log(values)
         setAuthorizing(true);
-        const res = await axios.post("http://localhost:5000/api/login", values);
+        const res = await axios.post("http://192.168.8.105:5000/api/login", values);
         localStorage.setItem("token", res.data.token); // Store JWT token
         router.push("/");
         //todo - if the token is given in response than we should push to the next stage
@@ -123,7 +132,16 @@ const page = () => {
                     <FormItem>
                       <FormLabel>Daily Access Code</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter today's access code" {...field} />
+                        <InputOTP maxLength={6} {...field}>
+                          <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                            <InputOTPSlot index={4} />
+                            <InputOTPSlot index={5} />
+                          </InputOTPGroup>
+                        </InputOTP>
                       </FormControl>
                       
                       <FormMessage />
