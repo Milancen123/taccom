@@ -80,6 +80,26 @@ app.get("/api/protected", authenticateToken, (req, res) => {
     res.json({ message: `Hello ${req.user.username}, you are authorized!` });
 });
 
+app.get("/api/me", authenticateToken, async (req, res) => {
+  try{
+    console.log("------------------------------------------------------------------");
+    console.log(req.user);
+    console.log("------------------------------------------------------------------\n\n\n\n");
+    const result = await pool.query(
+      "SELECT id, username, rank, unit, position, full_name FROM users WHERE username = $1",
+      [req.user.username]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
+
+    res.json(result.rows[0]);
+
+  }catch(err){
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+
+});
+
 // Login User
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;

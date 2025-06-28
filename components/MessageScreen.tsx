@@ -20,10 +20,10 @@ const formatTime = (timestamp: string): string => {
 };
 
 
-const MessageScreen = ({activeChannel}:any) => {
+const MessageScreen = ({activeChannel, currentUser}:any) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const [username, setUsername] = useState("User" + Math.floor(Math.random() * 1000));
+  const [username, setUsername] = useState(currentUser.username);
 
     // Handle "Enter" key press
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {

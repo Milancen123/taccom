@@ -1,5 +1,5 @@
 "use client"
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import SidebarItem from './shared/SidebarItem'
 
 //! Dummy data for now, until we decide to fetch the chanels
@@ -41,7 +41,15 @@ interface SidebarProps{
   setActiveChannel:()=>void;
 }
 
-const Sidebar = ({activeChannel, setActiveChannel}:any) => {
+const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
+  //const [navbarItems, setNavbarItems] = {[]};
+
+  useEffect(()=>{
+    //fetch all the channels
+
+
+
+  }, [])
   return (
     <div className='w-[20%] h-full overflow-hidden border-r-2 border-gray-200 p-2'>
       {
