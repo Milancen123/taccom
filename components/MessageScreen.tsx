@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Message from './Message'
@@ -33,6 +33,14 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
     }
   };
   
+  const messageListRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll to bottom
+  const scrollToBottom = () => {
+    if (messageListRef.current) {
+      messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
+    }
+  };
 
 
   const sendMessage = () => {
@@ -43,6 +51,7 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
       setMessage("");
       socket.emit("sendMessage", messageData);
       setMessage(""); // Clear input
+      setTimeout(scrollToBottom, 100); // Ensure DOM update before scroll
     }
   };
 
@@ -71,13 +80,13 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
     setMessages([]);
   }, [activeChannel])
   return (
-    <div className="w-full h-[90%] flex flex-col justify-between ">
+    <div className="flex flex-col flex-1 justify-between overflow-hidden">
       {/* Message Display (Takes Full Height) */}
         <div className='p-5 border-b-2 border-slate-300'>
           <h1 className='text-2xl font-bold'>{activeChannel.channelName}</h1>
           <p className='text-base text-slate-600'>3 members online</p>
         </div>
-        <div className="flex-col flex-1 border-b-2 border-slate-300 mt-5 p-2 gap-4 overflow-y-scroll">
+        <div className="flex-col flex-1 border-b-2 border-slate-300 mt-5 p-2 gap-4 overflow-y-scroll" ref={messageListRef}>
           {/* Example messages (Replace with dynamic messages) */}
           {/* <Message 
           img_url={'https://avatars.githubusercontent.com/u/124599?v=4'}
@@ -94,6 +103,7 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
               date={"2025-03-13"}
               time={formatTime(message.timestamp)}
               message={message.message}
+              sentByMe={message.sender == currentUser.username}
               key={`${message.sender} ${message.timestamp}`}
               />
             ))

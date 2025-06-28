@@ -22,12 +22,11 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
  
   useEffect(()=>{
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    
+     const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
     (async ()=> {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
@@ -53,14 +52,19 @@ export default function Home() {
 
   return (
     <SignedIn>
-      <div className="w-full h-screen overflow-hidden">
-        <Navbar currentUser={user}/>
-        <div className="flex h-full w-screen">
-          <Sidebar activeChannel={activeChannel} setActiveChannel={setActiveChannel}/> 
-          <MessageScreen activeChannel={activeChannel} currentUser={user}/>
-        </div>
+      <div className="flex flex-col h-screen w-screen overflow-hidden">
+        {/* Navbar stays at the top */}
+        <Navbar currentUser={user} />
 
+        {/* Main content area fills remaining height */}
+        <div className="flex flex-1 w-full overflow-hidden">
+          <Sidebar activeChannel={activeChannel} setActiveChannel={setActiveChannel} />
+
+          {/* MessageScreen handles its own layout inside */}
+          <MessageScreen activeChannel={activeChannel} currentUser={user} />
+        </div>
       </div>
     </SignedIn>
+
   );
 }

@@ -11,24 +11,33 @@ interface MessageProps{
     date:string;
     time:string;
     message:string;
+    sentByMe:boolean;
 }
 
-const Message = ({img_url, name, date, time, message}:MessageProps) => {
+const Message = ({img_url, name, date, time, message, sentByMe}:MessageProps) => {
   return (
-    <div className='flex items-center w-full gap-3 mt-4'>
-        <Avatar>
-            <AvatarImage src="https://github.com/shadcn.png" />
-            <AvatarFallback>CN</AvatarFallback>
-        </Avatar>
-        <div className='flex flex-col'>
-            <div className='flex items-center gap-2'>
+    <div className={`flex items-center w-full gap-3 mt-4 ${sentByMe ? 'justify-end' : 'justify-start'}`}>
+        {!sentByMe && (
+            <Avatar>
+                <AvatarImage src="https://github.com/shadcn.png" />
+                <AvatarFallback>name[0]</AvatarFallback>
+            </Avatar>
+        )}
+        <div className={`flex flex-col`}>
+            <div className={`flex items-center gap-2 ${sentByMe?'justify-end' : 'justify-start'}`}>
                 <h1 className='text-lg font-bold'>{name}</h1>
                 <p className='text-slate-600'>{time}</p>
             </div>
-            <div>
+            <div className={`${sentByMe ? 'text-right' : 'text-left'}`}>
                 <h1>{message}</h1>
             </div>
         </div>
+        {sentByMe && (
+            <Avatar>
+                <AvatarImage src="https://github.com/shadcn.png" />
+                <AvatarFallback>name[0]</AvatarFallback>
+            </Avatar>
+        )}
     </div>
   )
 }
