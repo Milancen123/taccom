@@ -30,6 +30,7 @@ export default function Home() {
     (async ()=> {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
+      console.log(currentUser);
     })();
   }, [])
 
@@ -44,7 +45,7 @@ export default function Home() {
   // const user = {
   //   id:1,
   //   username:"Milan Nikolic",
-  //   fullname:"Milan Nikolic",
+  //   full_name:"Milan Nikolic",
   //   rank:"potpukovnik",
   //   unit:"146. klasa",
   //   position:"Komandant klase"

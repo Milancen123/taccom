@@ -82,9 +82,7 @@ app.get("/api/protected", authenticateToken, (req, res) => {
 
 app.get("/api/me", authenticateToken, async (req, res) => {
   try{
-    console.log("------------------------------------------------------------------");
-    console.log(req.user);
-    console.log("------------------------------------------------------------------\n\n\n\n");
+
     const result = await pool.query(
       "SELECT id, username, rank, unit, position, full_name FROM users WHERE username = $1",
       [req.user.username]
@@ -99,6 +97,52 @@ app.get("/api/me", authenticateToken, async (req, res) => {
   }
 
 });
+
+
+
+
+
+
+
+const getUnreadMessagesPerChannel = async (userId) => {
+  const query = `
+    SELECT 
+      c.id,
+      c.name AS "channelName",
+      COUNT(m.id) AS messages
+    FROM channels c
+    LEFT JOIN channel_reads cr 
+      ON cr.channel_id = c.id AND cr.user_id = $1
+    LEFT JOIN messages m 
+      ON m.channel_id = c.id 
+      AND m.created_at > COALESCE(cr.last_read_at, '1970-01-01')
+    GROUP BY c.id, c.name
+    ORDER BY c.id;
+  `;
+
+  try {
+    const { rows } = await pool.query(query, [userId]);
+    return rows; // Each row will be { id, channelName, messages }
+  } catch (error) {
+    console.error('Error fetching unread messages:', error);
+    throw error;
+  }
+};
+
+
+
+app.get("/api/channels", authenticateToken, async (req, res) => {
+  try{
+    const userId = await pool.query(
+      "SELECT id FROM users WHERE username= $1", [req.user.username]
+    );
+    console.log(userId);
+    const channels = await getUnreadMessagesPerChannel(userId.rows[0]["id"]);
+    res.json(channels);
+  }catch(err){
+    res.status(500).json({ error: 'Failed to load channels with unread messages.' });
+  }
+})
 
 // Login User
 app.post("/api/login", async (req, res) => {

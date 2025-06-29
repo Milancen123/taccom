@@ -16,7 +16,7 @@ interface MessageProps{
 
 const Message = ({img_url, name, date, time, message, sentByMe}:MessageProps) => {
   return (
-    <div className={`flex items-center w-full gap-3 mt-4 ${sentByMe ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex items-center  gap-3 mt-4 ${sentByMe ? 'justify-end' : 'justify-start'} `}>
         {!sentByMe && (
             <Avatar>
                 <AvatarImage src="https://github.com/shadcn.png" />

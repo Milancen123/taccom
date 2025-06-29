@@ -38,7 +38,7 @@ const Navbar = ({currentUser}:any) => {
         <PopoverContent className='w-[250px] bg-white p-4 drop-shadow-md rounded-md border-[1px] border-slate-100 flex flex-col gap-2'>
 
           <div className='flex flex-col gap-0 border-b-[1px] border-slate-300'>
-            <h1 className='text-base font-semibold'>{currentUser.username}</h1>
+            <h1 className='text-base font-semibold'>{currentUser.full_name}</h1>
             <h2 className='text-sm text-slate-600'>{currentUser.rank}</h2>
           </div>
   
