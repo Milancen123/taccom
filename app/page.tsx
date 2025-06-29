@@ -7,7 +7,7 @@ import Spinner from "@/components/Spiner";
 import { getCurrentUser } from "@/utils/auth";
 import { updateChannelReads } from "@/utils/database";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 
 export default function Home() {
@@ -19,7 +19,9 @@ export default function Home() {
     url_path: "commandcenter",
   });
 
-  
+
+
+
   const [user, setUser] = useState<any>(null);
 
   

@@ -17,7 +17,7 @@ const SignedIn = ({children} : any) => {
       return;
     }
     axios
-      .get("http://192.168.8.105:5000/api/protected", {
+      .get("http://localhost:5000/api/protected", {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then(() => setIsAuthenticated(true))
