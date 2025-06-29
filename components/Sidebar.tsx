@@ -31,6 +31,16 @@ const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
     
   }, [])
 
+  useEffect(()=>{
+    //fetch all the channels when the channel changes
+    (async()=> {
+      const response = await getChannels();
+      setChannels(response);
+
+    })();
+    
+  }, [activeChannel])
+
 
   //! Make the current user data here, based on the JWT credential
   if(!channels){
