@@ -5,22 +5,25 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import Spinner from "@/components/Spiner";
 import { getCurrentUser } from "@/utils/auth";
+import { updateChannelReads } from "@/utils/database";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 
 export default function Home() {
+  const router = useRouter();
+  
   const [activeChannel, setActiveChannel] = useState({
     channelName: "Command Center",
     messages: 0,
     url_path: "commandcenter",
   });
-  const router = useRouter();
 
-
-
+  
   const [user, setUser] = useState<any>(null);
- 
+
+  
+
   useEffect(()=>{
      const token = localStorage.getItem("token");
       if (!token) {
@@ -30,7 +33,7 @@ export default function Home() {
     (async ()=> {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
-      console.log(currentUser);
+      await updateChannelReads(activeChannel.channelName);
     })();
   }, [])
 
@@ -39,17 +42,6 @@ export default function Home() {
     return <Spinner/>
   }
 
-
-  //! make the user logic so that each screen is defined for that one user specifically
-  
-  // const user = {
-  //   id:1,
-  //   username:"Milan Nikolic",
-  //   full_name:"Milan Nikolic",
-  //   rank:"potpukovnik",
-  //   unit:"146. klasa",
-  //   position:"Komandant klase"
-  // }
 
   return (
     <SignedIn>

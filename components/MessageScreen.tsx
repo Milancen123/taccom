@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Message from './Message'
 import { io } from "socket.io-client";
+import { saveMessage, updateChannelReads } from '@/utils/database'
 
 const socket = io("http://localhost:5000");
 
@@ -25,6 +26,10 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
   const [messages, setMessages] = useState([]);
   const [username, setUsername] = useState(currentUser.username);
 
+
+  const messageListRef = useRef<HTMLDivElement | null>(null);
+
+
     // Handle "Enter" key press
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
@@ -33,15 +38,12 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
     }
   };
   
-  const messageListRef = useRef<HTMLDivElement | null>(null);
-
   // Scroll to bottom
   const scrollToBottom = () => {
     if (messageListRef.current) {
       messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
     }
   };
-
 
   const sendMessage = () => {
     if (message.trim()) {
@@ -50,6 +52,11 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
       console.log(messageData);
       setMessage("");
       socket.emit("sendMessage", messageData);
+      (async () => {
+        await saveMessage(activeChannel.channelName, message);
+        await updateChannelReads(activeChannel.channelName);
+      })();
+
       setMessage(""); // Clear input
       setTimeout(scrollToBottom, 100); // Ensure DOM update before scroll
     }
@@ -59,11 +66,7 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
     // Join the selected channel
     socket.emit("joinChannel", activeChannel.channelName);
 
-    // Listen for chat history
-    // socket.on("chatHistory", (history) => {
-    //   setMessages(history);
-    // });
-
+    
     // Listen for new messages
     socket.on("receiveMessage", (newMessage) => {
       console.log(newMessage);
@@ -78,7 +81,13 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
 
   useEffect(()=>{
     setMessages([]);
+    (async()=>{
+      await updateChannelReads(activeChannel.channelName);
+    })();
   }, [activeChannel])
+
+
+
   return (
     <div className="flex flex-col flex-1 justify-between overflow-hidden">
       {/* Message Display (Takes Full Height) */}
@@ -87,14 +96,6 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
           <p className='text-base text-slate-600'>3 members online</p>
         </div>
         <div className="flex-col flex-1 border-b-2 border-slate-300 mt-5 p-2 gap-4 overflow-y-scroll" ref={messageListRef}>
-          {/* Example messages (Replace with dynamic messages) */}
-          {/* <Message 
-          img_url={'https://avatars.githubusercontent.com/u/124599?v=4'}
-          name={"Milan Nikolic"}
-          date={"2025-03-13"}
-          time={"11:10am"}
-          message={"Hello is everyone alright with the time we discussed earlier"}
-          /> */}
           {
             messages.map((message, index) => (
               <Message

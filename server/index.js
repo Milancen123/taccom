@@ -169,6 +169,96 @@ app.get("/api/protected", authenticateToken, (req, res) => {
 });
 
 
+// saving messages to the database, post method
+
+// Save a message to the messages table
+app.post("/api/saveMessage/:channelName", authenticateToken, async (req, res) => {
+  try {
+    const { content } = req.body;
+    const { channelName } = req.params;
+
+    if (!content || !channelName) {
+      return res.status(400).json({ error: "Missing content or channel name." });
+    }
+
+    // Get the user ID from JWT payload
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE username = $1",
+      [req.user.username]
+    );
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const userId = userResult.rows[0].id;
+
+    // Get the channel ID by name
+    const channelResult = await pool.query(
+      "SELECT id FROM channels WHERE name = $1",
+      [channelName]
+    );
+    if (channelResult.rowCount === 0) {
+      return res.status(404).json({ error: "Channel not found." });
+    }
+    const channelId = channelResult.rows[0].id;
+
+    // Insert the message into the database
+    await pool.query(
+      "INSERT INTO messages (user_id, channel_id, content, created_at) VALUES ($1, $2, $3, NOW())",
+      [userId, channelId, content]
+    );
+
+    //update channel_read
+
+
+    return res.status(201).json({ success: true, message: "Message saved successfully." });
+  } catch (err) {
+    console.error("Error saving message:", err);
+    return res.status(500).json({ error: "Failed to save message to the database." });
+  }
+});
+
+
+//update channel read
+app.put("/api/updateChannelRead/:channelName", authenticateToken, async (req, res) => {
+  try{
+    console.log("Ovde sam sada");
+    const {channelName} = req.params;
+    if(!channelName) return res.status(400).json({ error: "Missing content or channel name." });
+
+    // Get the user ID from JWT payload
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE username = $1",
+      [req.user.username]
+    );
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const userId = userResult.rows[0].id;
+
+    // Get the channel ID by name
+    const channelResult = await pool.query(
+      "SELECT id FROM channels WHERE name = $1",
+      [channelName]
+    );
+    if (channelResult.rowCount === 0) {
+      return res.status(404).json({ error: "Channel not found." });
+    }
+    const channelId = channelResult.rows[0].id;
+
+    console.log("Ipdatejtujem sada channel read");
+    await pool.query(
+      `UPDATE channel_reads
+       SET last_read_at = NOW()
+       WHERE user_id = $1 AND channel_id = $2`,
+      [userId, channelId]
+    );
+
+    return res.status(201).json({ success: true, message: "Message saved successfully." });
+  }catch(error){
+    console.error("Error saving message:", err);
+    return res.status(500).json({ error: "Failed to save message to the database." });
+  }
+})
 
 
 

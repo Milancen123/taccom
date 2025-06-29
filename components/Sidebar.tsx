@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect, useState } from 'react'
 import SidebarItem from './shared/SidebarItem'
-import { getChannels } from '@/utils/database';
+import { getChannels, updateChannelReads } from '@/utils/database';
 import Spinner from './Spiner';
 
 
@@ -19,7 +19,7 @@ interface Channel{
 
 const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
   // setting the channels, and the numb of unread messages for currentUser
-  const [channels, setChannels] = useState<Channel[]>(null);
+  const [channels, setChannels] = useState<Channel[] | null>(null);
 
   useEffect(()=>{
     //fetch all the channels
@@ -37,7 +37,18 @@ const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
     return <Spinner/>
   }
 
+  const setChannel = (channel:any)=>{
+    //update previous
+    (async()=> {
+      await updateChannelReads(channel.channelName)
+    })();
 
+    setActiveChannel(channel);
+
+    (async()=> {
+      await updateChannelReads(activeChannel.channelName)
+    })();
+  }
   return (
     <div className='w-[20%] h-full overflow-hidden border-r-2 border-gray-200 p-2'>
       {
@@ -46,7 +57,7 @@ const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
           name = {channel.channelName}
           messages = {channel.messages}
           active={activeChannel.channelName === channel.channelName}
-          onClick={()=>setActiveChannel(channel)}
+          onClick={()=>setChannel(channel)}
           key = {index}
           />
         ))
