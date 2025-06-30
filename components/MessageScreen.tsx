@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Message from './Message'
 import { io } from "socket.io-client";
-import { saveMessage, updateChannelReads } from '@/utils/database'
+import { fetchAllMessagesForChannel, saveMessage, updateChannelReads } from '@/utils/database'
 import FormattedDate from './FormattedDate'
+import NewMessage from './NewMessage'
+import ScrollDownArrow from './ScrollDownArrow'
 
 const socket = io("http://localhost:5000");
 
@@ -54,88 +56,6 @@ function formatDate(timestamp: string): string {
 
 
 
-const dummyMessages = [
-  // Day before yesterday
-  {
-    sender: "Jelena Vukovic",
-    message: "Sending over the drone footage now.",
-    timestamp: new Date(Date.now() - 2 * 86400000).toISOString()
-  },
-  {
-    sender: "Milan Nikolic",
-    message: "Got it. Reviewing immediately.",
-    timestamp: new Date(Date.now() - 2 * 86400000).toISOString()
-  },
-  {
-    sender: "Petar Jovanovic",
-    message: "Targets are confirmed visually.",
-    timestamp: new Date(Date.now() - 2 * 86400000).toISOString()
-  },
-  {
-    sender: "Jelena Vukovic",
-    message: "Requesting backup for night patrol.",
-    timestamp: new Date(Date.now() - 2 * 86400000).toISOString()
-  },
-  {
-    sender: "Milan Nikolic",
-    message: "Approved. Two squads will be dispatched.",
-    timestamp: new Date(Date.now() - 2 * 86400000).toISOString()
-  },
-
-  // Yesterday
-  {
-    sender: "Milan Nikolic",
-    message: "Debrief starts at 0800 sharp.",
-    timestamp: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    sender: "Petar Jovanovic",
-    message: "Understood. I’ll be ready.",
-    timestamp: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    sender: "Jelena Vukovic",
-    message: "Confirming location for the briefing?",
-    timestamp: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    sender: "Milan Nikolic",
-    message: "Same HQ room as last time.",
-    timestamp: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    sender: "Petar Jovanovic",
-    message: "Perfect, I’ll notify the rest.",
-    timestamp: new Date(Date.now() - 86400000).toISOString()
-  },
-
-  // Today
-  {
-    sender: "Milan Nikolic",
-    message: "Let's finalize the mission plan today.",
-    timestamp: new Date().toISOString()
-  },
-  {
-    sender: "Petar Jovanovic",
-    message: "Copy that, updating the logistics status now.",
-    timestamp: new Date().toISOString()
-  },
-  {
-    sender: "Milan Nikolic",
-    message: "Great. Let me know when it's ready.",
-    timestamp: new Date().toISOString()
-  },
-  {
-    sender: "Petar Jovanovic",
-    message: "Will do. Estimated in 10 minutes.",
-    timestamp: new Date().toISOString()
-  },
-  {
-    sender: "Jelena Vukovic",
-    message: "Are we including the intel from last night?",
-    timestamp: new Date().toISOString()
-  }
-];
 
 
 
@@ -143,9 +63,12 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [username, setUsername] = useState(currentUser.username);
-
-
+  const [shouldScrollToNewMessage, setShouldScrollToNewMessage] = useState(false);
   const messageListRef = useRef<HTMLDivElement | null>(null);
+  const newMessageRef = useRef<HTMLDivElement | null>(null);
+
+
+
   let lastRenderedDate: string | null = null;
 
   // fetch messages from dataabase and display them
@@ -166,6 +89,7 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
     }
   };
 
+  
   const sendMessage = () => {
     if (message.trim()) {
       const timestamp = new Date().toISOString(); // Get current date & time in ISO format
@@ -183,8 +107,13 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
     }
   };
 
+
+
   useEffect(()=>{
-    setMessages(dummyMessages);
+    (async() => {
+      const msgs = await fetchAllMessagesForChannel(activeChannel.channelName);
+      setMessages(msgs);
+    })();
   }, []);
   useEffect(() => {
     // Join the selected channel
@@ -193,8 +122,11 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
     
     // Listen for new messages
     socket.on("receiveMessage", (newMessage) => {
-      console.log(newMessage);
-      if(newMessage.channelName === activeChannel.channelName) setMessages((prev) => [...prev, newMessage]);
+      const formattedMessage = {
+        ...newMessage,
+        newMessage: true,
+      };
+      if(newMessage.channelName === activeChannel.channelName) setMessages((prev) => [...prev, formattedMessage]);
     });
 
     return () => {
@@ -203,15 +135,46 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
     };
   }, [activeChannel]); // Re-run when channel changes
 
+  let newMessages =false;
+
+
   useEffect(()=>{
     setMessages([]);
     (async()=>{
-      await updateChannelReads(activeChannel.channelName);
+      //! already updating that in the sidebar.tsx
+      //await updateChannelReads(activeChannel.channelName);
+      
+      const msgs = await fetchAllMessagesForChannel(activeChannel.channelName);
+      setMessages(msgs);
+
+      const hasNew = msgs.some(
+        (msg) => msg.newMessage && msg.username !== currentUser.username && msg.sender !== currentUser.username
+      );
+  
+      if (hasNew) {
+        setShouldScrollToNewMessage(true);
+      }else{
+        console.log("Scrokluj do dna");
+
+      }
     })();
   }, [activeChannel])
 
+  useEffect(() => {
+    if (shouldScrollToNewMessage && newMessageRef.current) {
+      newMessageRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      setShouldScrollToNewMessage(false);
+      return;
+    }
 
+  }, [messages, shouldScrollToNewMessage]);
 
+  // Scroll to bottom when there's NO new message (only if you really want it)
+  useEffect(() => {
+    if (!shouldScrollToNewMessage) {
+      scrollToBottom();
+    }
+  }, [messages]);
   return (
     <div className="flex flex-col flex-1 justify-between overflow-hidden">
       {/* Message Display (Takes Full Height) */}
@@ -221,22 +184,34 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
         </div>
         <div className="flex-col flex-1 border-b-2 border-slate-300 mt-5 p-2 gap-4 overflow-y-scroll" ref={messageListRef}>
           {messages.map((message, index) => {
-            const currentDate = new Date(message.timestamp).toDateString(); // Only the date part
+            const currentDate = new Date(message.timestamp || message.created_at).toDateString(); // Only the date part
             const shouldRenderDate = currentDate !== lastRenderedDate;
             lastRenderedDate = currentDate;
 
+
+            let shouldShowNewMessage;
+            if(message.newMessage && !(message.sender === currentUser.username || message.username === currentUser.username)) {
+              shouldShowNewMessage = !newMessages && (message.newMessage);
+              if (shouldShowNewMessage) {
+                newMessages = true;
+              }
+            }
+          
+
             return (
-              <React.Fragment key={`${message.sender}-${message.timestamp}-${index}`}>
+              <React.Fragment key={`${message.sender}-${message.timestamp || message.created_at}-${index}`}>
                 {shouldRenderDate && (
-                  <FormattedDate timestamp={message.timestamp} />
+                  <FormattedDate timestamp={message.timestamp || message.created_at} />
                 )}
+                {(shouldShowNewMessage && !(message.sender === currentUser.username || message.username === currentUser.username)) && <div ref={newMessageRef}><NewMessage /></div>}
+                <ScrollDownArrow />
                 <Message
                   img_url={'https://avatars.githubusercontent.com/u/124599?v=4'}
-                  name={`${message.sender}`}
+                  name={`${message.sender || message.username}`}
                   date={currentDate}
-                  time={formatTime(message.timestamp)}
-                  message={message.message}
-                  sentByMe={message.sender === currentUser.username}
+                  time={formatTime(message.timestamp || message.created_at)}
+                  message={message.message || message.content}
+                  sentByMe={message.sender === currentUser.username || message.username === currentUser.username}
                 />
               </React.Fragment>
             );

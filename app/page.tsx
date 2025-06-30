@@ -35,7 +35,7 @@ export default function Home() {
     (async ()=> {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
-      await updateChannelReads(activeChannel.channelName);
+      //await updateChannelReads(activeChannel.channelName);
     })();
   }, [])
 

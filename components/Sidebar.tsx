@@ -47,17 +47,23 @@ const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
     return <Spinner/>
   }
 
+
   const setChannel = (channel:any)=>{
     //update previous
     (async()=> {
-      await updateChannelReads(channel.channelName)
+      await updateChannelReads(activeChannel.channelName)
     })();
 
     setActiveChannel(channel);
+    
+    //update current
+    // (async()=> {
+    //   await updateChannelReads(channel.channelName)
+    // })();
 
-    (async()=> {
-      await updateChannelReads(activeChannel.channelName)
-    })();
+  
+    //! maybe dont update channel reads for the newly current channel
+
   }
   return (
     <div className='w-[20%] h-full overflow-hidden border-r-2 border-gray-200 p-2'>

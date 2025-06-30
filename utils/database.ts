@@ -57,3 +57,46 @@ export const updateChannelReads = async (channelName:string): Promise<any|null> 
       return null;
   }
 }
+
+
+export const fetchAllMessagesForChannel = async (channelName:string) : Promise<any|null> => {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+  try{
+    const resRead = await axios.post(
+      `http://localhost:5000/api/readMessages/${channelName}`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+
+    const resUnread = await axios.post(
+      `http://localhost:5000/api/unreadMessages/${channelName}`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+
+    const allMessages = [...resRead.data, ...resUnread.data];
+
+    // Sort by timestamp ascending
+    allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+
+    return allMessages;
+
+  }catch(err){
+      console.error("Failed to update channel read", err);
+      return null;
+  }
+}

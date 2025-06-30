@@ -262,4 +262,135 @@ app.put("/api/updateChannelRead/:channelName", authenticateToken, async (req, re
 
 
 
+// get the unread messages from database for each channel
+app.post("/api/unreadMessages/:channelName", authenticateToken, async (req, res) => {
+  try {
+    const { channelName } = req.params;
+
+    // Get user ID from JWT
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE username = $1",
+      [req.user.username]
+    );
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userId = userResult.rows[0].id;
+
+    // Get channel ID
+    const channelResult = await pool.query(
+      "SELECT id FROM channels WHERE name = $1",
+      [channelName]
+    );
+    if (channelResult.rowCount === 0) {
+      return res.status(404).json({ error: "Channel not found" });
+    }
+    const channelId = channelResult.rows[0].id;
+
+    // Get last read timestamp (or 1970-01-01 if none)
+    const readResult = await pool.query(
+      `SELECT last_read_at FROM channel_reads 
+       WHERE user_id = $1 AND channel_id = $2`,
+      [userId, channelId]
+    );
+    const lastRead = readResult.rows[0]?.last_read_at || new Date(0); // 1970 fallback
+
+    // Fetch unread messages and join with user info
+    const messageResult = await pool.query(
+      `SELECT 
+          m.id,
+          m.content,
+          m.created_at,
+          u.id as user_id,
+          u.username,
+          u.full_name,
+          u.rank,
+          u.unit,
+          u.position
+       FROM messages m
+       JOIN users u ON u.id = m.user_id
+       WHERE m.channel_id = $1 AND m.created_at > $2
+       ORDER BY m.created_at ASC`,
+      [channelId, lastRead]
+    );
+
+    // Add newMessage: true to each result
+    const messagesWithFlag = messageResult.rows.map(msg => ({
+      ...msg,
+      newMessage: true
+    }));
+
+    res.status(200).json(messagesWithFlag);
+  } catch (err) {
+    console.error("Error fetching unread messages:", err);
+    res.status(500).json({ error: "Failed to retrieve messages" });
+  }
+});
+
+
+// get all read messages from database for particular channel
+app.post("/api/readMessages/:channelName", authenticateToken, async (req, res) => {
+  try {
+    const { channelName } = req.params;
+
+    // Get user ID from JWT
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE username = $1",
+      [req.user.username]
+    );
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userId = userResult.rows[0].id;
+
+    // Get channel ID by name
+    const channelResult = await pool.query(
+      "SELECT id FROM channels WHERE name = $1",
+      [channelName]
+    );
+    if (channelResult.rowCount === 0) {
+      return res.status(404).json({ error: "Channel not found" });
+    }
+    const channelId = channelResult.rows[0].id;
+
+    // Get last read timestamp
+    const readResult = await pool.query(
+      `SELECT last_read_at FROM channel_reads 
+       WHERE user_id = $1 AND channel_id = $2`,
+      [userId, channelId]
+    );
+    const lastRead = readResult.rows[0]?.last_read_at || new Date(); // fallback: now = nothing read
+
+    // Fetch messages read up to last_read_at
+    const messageResult = await pool.query(
+      `SELECT 
+          m.id,
+          m.content,
+          m.created_at,
+          u.id as user_id,
+          u.username,
+          u.full_name,
+          u.rank,
+          u.unit,
+          u.position
+       FROM messages m
+       JOIN users u ON u.id = m.user_id
+       WHERE m.channel_id = $1 AND m.created_at <= $2
+       ORDER BY m.created_at ASC`,
+      [channelId, lastRead]
+    );
+
+    const messagesWithFlag = messageResult.rows.map(msg => ({
+      ...msg,
+      newMessage: false
+    }));
+
+    res.status(200).json(messagesWithFlag);
+  } catch (err) {
+    console.error("Error fetching read messages:", err);
+    res.status(500).json({ error: "Failed to retrieve messages" });
+  }
+});
+
+
 server.listen(5000, () => console.log("Auth Server running on port 5000"));
