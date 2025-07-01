@@ -30,7 +30,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Initialize socket only once
   useEffect(() => {
-    const newSocket = io("http://localhost:5000");
+    const newSocket = io("http://192.168.8.105:5000");
     setSocket(newSocket);
 
     return () => {

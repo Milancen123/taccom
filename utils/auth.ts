@@ -5,7 +5,7 @@ export const getCurrentUser = async (): Promise<any | null> => {
   if (!token) return null;
 
   try {
-    const res = await axios.get("http://localhost:5000/api/me", {
+    const res = await axios.get("http://192.168.8.105:5000/api/me", {
       headers: { Authorization: `Bearer ${token}` },
     });
     return res.data;

@@ -45,7 +45,7 @@ export default function Home() {
     return <Spinner/>
   }
 
-  const socket = io("http://localhost:5000");
+  const socket = io("http://192.168.8.105:5000");
   
   return (
     <SignedIn>

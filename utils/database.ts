@@ -5,7 +5,7 @@ export const getChannels = async (): Promise<any | null> => {
   if (!token) return null;
 
   try {
-    const res = await axios.get("http://localhost:5000/api/channels", {
+    const res = await axios.get("http://192.168.8.105:5000/api/channels", {
       headers: { Authorization: `Bearer ${token}` },
     });
     return res.data;
@@ -21,7 +21,7 @@ export const saveMessage = async (channelName: string, content: string): Promise
   
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/saveMessage/${channelName}`,
+        `http://192.168.8.105:5000/api/saveMessage/${channelName}`,
         { content }, // this is the POST body
         {
           headers: {
@@ -42,7 +42,7 @@ export const updateChannelReads = async (channelName:string): Promise<any|null> 
   if (!token) return null;
   try{
     const res = await axios.put(
-      `http://localhost:5000/api/updateChannelRead/${channelName}`,
+      `http://192.168.8.105:5000/api/updateChannelRead/${channelName}`,
       {},
       {
         headers: {
@@ -64,7 +64,7 @@ export const fetchAllMessagesForChannel = async (channelName:string) : Promise<a
   if (!token) return null;
   try{
     const resRead = await axios.post(
-      `http://localhost:5000/api/readMessages/${channelName}`,
+      `http://192.168.8.105:5000/api/readMessages/${channelName}`,
       {},
       {
         headers: {
@@ -76,7 +76,7 @@ export const fetchAllMessagesForChannel = async (channelName:string) : Promise<a
 
 
     const resUnread = await axios.post(
-      `http://localhost:5000/api/unreadMessages/${channelName}`,
+      `http://192.168.8.105:5000/api/unreadMessages/${channelName}`,
       {},
       {
         headers: {
@@ -108,7 +108,7 @@ export const getAllUsers = async (): Promise<any | null> => {
   if (!token) return null;
 
   try {
-    const res = await axios.get("http://localhost:5000/api/getAllUsers", {
+    const res = await axios.get("http://192.168.8.105:5000/api/getAllUsers", {
       headers: { Authorization: `Bearer ${token}` },
     });
     return res.data;

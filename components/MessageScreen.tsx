@@ -17,6 +17,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import User from './User'
+import MessageList from './MessageList'
 
 
 
@@ -245,39 +246,12 @@ const MessageScreen = ({activeChannel, currentUser, socket}:any) => {
           </Sheet>
         </div>
         <div className="flex-col flex-1 border-b-2 border-slate-300 mt-5 p-2 gap-4 overflow-y-scroll" ref={messageListRef}>
-          {messages.map((message, index) => {
-            const currentDate = new Date(message.timestamp || message.created_at).toDateString(); // Only the date part
-            const shouldRenderDate = currentDate !== lastRenderedDate;
-            lastRenderedDate = currentDate;
-
-
-            let shouldShowNewMessage;
-            if(message.newMessage && !(message.sender === currentUser.username || message.username === currentUser.username)) {
-              shouldShowNewMessage = !newMessages && (message.newMessage);
-              if (shouldShowNewMessage) {
-                newMessages = true;
-              }
-            }
-          
-
-            return (
-              <React.Fragment key={`${message.sender}-${message.timestamp || message.created_at}-${index}`}>
-                {shouldRenderDate && (
-                  <FormattedDate timestamp={message.timestamp || message.created_at} />
-                )}
-                {(shouldShowNewMessage && !(message.sender === currentUser.username || message.username === currentUser.username)) && <div ref={newMessageRef}><NewMessage /></div>}
-                <ScrollDownArrow />
-                <Message
-                  img_url={'https://avatars.githubusercontent.com/u/124599?v=4'}
-                  name={`${message.sender || message.username}`}
-                  date={currentDate}
-                  time={formatTime(message.timestamp || message.created_at)}
-                  message={message.message || message.content}
-                  sentByMe={message.sender === currentUser.username || message.username === currentUser.username}
-                />
-              </React.Fragment>
-            );
-          })}
+          <MessageList 
+           messages={messages}
+           currentUser={currentUser}
+           newMessageRef={newMessageRef}
+           formatTime={formatTime}
+          />
         </div>
 
         {/* Input Section (Fixed at Bottom) */}

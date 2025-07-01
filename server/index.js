@@ -12,14 +12,18 @@ const { Server } = require("socket.io");
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // Allow frontend requests
+app.use(cors({
+  origin: "*",
+  credentials: true
+}));
 const server = http.createServer(app);
 
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Allow Next.js frontend
+    origin: "*", // Allow Next.js frontend
     methods: ["GET", "POST"],
+    credentials:true,
   },
 })
 
@@ -416,4 +420,4 @@ app.get("/api/getAllUsers", authenticateToken, async (req,res) => {
   }
 })
 
-server.listen(5000, () => console.log("Auth Server running on port 5000"));
+server.listen(5000,"0.0.0.0", () => console.log("Auth Server running on port 5000"));

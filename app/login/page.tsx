@@ -74,7 +74,7 @@ const page = () => {
       try{
         console.log(values)
         setAuthorizing(true);
-        const res = await axios.post("http://localhost:5000/api/login", values);
+        const res = await axios.post("http://192.168.8.105:5000/api/login", values);
         localStorage.setItem("token", res.data.token); // Store JWT token
         router.push("/");
         //todo - if the token is given in response than we should push to the next stage
