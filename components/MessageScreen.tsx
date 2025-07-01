@@ -136,6 +136,8 @@ const MessageScreen = ({activeChannel, currentUser, socket}:any) => {
       setMessages(msgs);
     })();
   }, []);
+
+  
   useEffect(() => {
     // Join the selected channel
     socket.emit("joinChannel", activeChannel.channelName);
@@ -200,12 +202,12 @@ const MessageScreen = ({activeChannel, currentUser, socket}:any) => {
 
   //tracking the number of online users
   useEffect(() => {
+    if (!socket) return;
     //fetch all users
     (async() => {
       const users = await getAllUsers();
       setAllUsers(users);
     })();
-    
     // Connect and identify the user
     socket.emit("userOnline", currentUser.username); // or currentUser.id if you prefer
   
@@ -218,8 +220,9 @@ const MessageScreen = ({activeChannel, currentUser, socket}:any) => {
     // Clean up on unmount
     return () => {
       socket.off("onlineUsers");
+      //socket.disconnect();
     };
-  }, []);
+  }, [activeChannel]);
 
 
 

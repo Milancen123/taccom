@@ -31,17 +31,33 @@ const io = new Server(server, {
 const chatRooms = {};
 const onlineUsers = new Map();
 io.on("connection", (socket) => {
-  console.log(`User connected: ${socket.id}`);
+  //console.log(`User connected: ${socket.id}`);
 
 
   socket.on("userOnline", (username) => {
-    const isAlreadyOnline = Array.from(onlineUsers.values()).includes(username);
 
-    if (!isAlreadyOnline) {
-      onlineUsers.set(socket.id, username);
-      io.emit("onlineUsers", Array.from(onlineUsers.values()));
-    }
+      const targetUsername = username; // get username from socket ID
+      console.log("targetUsername " + targetUsername);
+      if(targetUsername){
+        console.log("Brisemo ga sada");
+      // Delete all entries with this username (in case of multiple tabs)
+        for (const [id, name] of onlineUsers.entries()) {
+          if (name === targetUsername) {
+            onlineUsers.delete(id);
+          }
+        }
+        console.log("Remaining online users: ", Array.from(onlineUsers.values()));
+      }
+      console.log("sad ubacujemo drugi u niz");
+
+    onlineUsers.set(socket.id, username);
+    console.log("sad ovaj socketid i username ulaze u set", socket.id, username);
+    console.log("Remaining online users: ", Array.from(onlineUsers.values()));
+    console.log("\n\n\n\n\n");
+    io.emit("onlineUsers", Array.from(onlineUsers.values()));
+  
   })
+
 
 
   // User joins a chat channel
@@ -73,9 +89,21 @@ io.on("connection", (socket) => {
 
   // Handle user disconnect
   socket.on("disconnect", () => {
-    onlineUsers.delete(socket.id);
-    io.emit("onlineUsers", Array.from(onlineUsers.values()));
-    console.log(`User disconnected: ${socket.id}`);
+    const targetUsername = onlineUsers.get(socket.id); // get username from socket ID
+    console.log("trazimo ovaj username: " + targetUsername)
+    if (!targetUsername) return;
+
+    // Delete all entries with this username (in case of multiple tabs)
+    for (const [id, name] of onlineUsers.entries()) {
+      if (name === targetUsername) {
+        onlineUsers.delete(id);
+      }
+    }
+
+    console.log("User disconnected: " + targetUsername);
+    console.log("Remaining online users: ", Array.from(onlineUsers.values()));
+
+    io.emit("onlineUsers", Array.from(new Set(onlineUsers.values())));
   });
 });
 
@@ -153,7 +181,7 @@ app.get("/api/channels", authenticateToken, async (req, res) => {
     const userId = await pool.query(
       "SELECT id FROM users WHERE username= $1", [req.user.username]
     );
-    console.log(userId);
+   
     const channels = await getUnreadMessagesPerChannel(userId.rows[0]["id"]);
     res.json(channels);
   }catch(err){
@@ -164,7 +192,8 @@ app.get("/api/channels", authenticateToken, async (req, res) => {
 // Login User
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
-  console.log(username, password);
+
+
   const user = await pool.query('SELECT * FROM users WHERE username=$1', [username]);
 
   if (!user || !(await bcrypt.compare(password, user.rows[0].password))) {
@@ -238,7 +267,7 @@ app.post("/api/saveMessage/:channelName", authenticateToken, async (req, res) =>
 //update channel read
 app.put("/api/updateChannelRead/:channelName", authenticateToken, async (req, res) => {
   try{
-    console.log("Ovde sam sada");
+
     const {channelName} = req.params;
     if(!channelName) return res.status(400).json({ error: "Missing content or channel name." });
 
@@ -262,7 +291,6 @@ app.put("/api/updateChannelRead/:channelName", authenticateToken, async (req, re
     }
     const channelId = channelResult.rows[0].id;
 
-    console.log("Ipdatejtujem sada channel read");
     await pool.query(
       `UPDATE channel_reads
        SET last_read_at = NOW()
