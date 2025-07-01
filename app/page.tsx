@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/utils/auth";
 import { updateChannelReads } from "@/utils/database";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { io } from "socket.io-client";
 
 
 export default function Home() {
@@ -44,19 +45,20 @@ export default function Home() {
     return <Spinner/>
   }
 
-
+  const socket = io("http://localhost:5000");
+  
   return (
     <SignedIn>
       <div className="flex flex-col h-screen w-screen overflow-hidden">
         {/* Navbar stays at the top */}
-        <Navbar currentUser={user} />
+        <Navbar currentUser={user} socket={socket} />
 
         {/* Main content area fills remaining height */}
         <div className="flex flex-1 w-full overflow-hidden">
           <Sidebar activeChannel={activeChannel} setActiveChannel={setActiveChannel} />
 
           {/* MessageScreen handles its own layout inside */}
-          <MessageScreen activeChannel={activeChannel} currentUser={user} />
+          <MessageScreen activeChannel={activeChannel} currentUser={user} socket={socket} />
         </div>
       </div>
     </SignedIn>

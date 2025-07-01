@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from "react";
 
-const Logout = () => {
+const Logout = ({socket}:any) => {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
   
@@ -15,6 +15,7 @@ const Logout = () => {
   
   function handleLogout(){
     localStorage.removeItem("token");
+    socket.disconnect();
     router.push("/login");
   }
 

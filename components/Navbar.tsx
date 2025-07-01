@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/popover"
 
 
-const Navbar = ({currentUser}:any) => {
+const Navbar = ({currentUser, socket}:any) => {
 
 
   return (
@@ -54,12 +54,12 @@ const Navbar = ({currentUser}:any) => {
             <h1>Pozicija</h1>
             <h1>{currentUser.positionInTheUnit}</h1>
           </div>
-          <Logout/>
+          <Logout socket={socket}/>
         </PopoverContent>
       </Popover>
 
 
-        <Logout/>
+        <Logout socket={socket}/>
       </div>
     </div>
   )

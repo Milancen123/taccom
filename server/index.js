@@ -25,9 +25,20 @@ const io = new Server(server, {
 
 // Store messages per channel
 const chatRooms = {};
-
+const onlineUsers = new Map();
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
+
+
+  socket.on("userOnline", (username) => {
+    const isAlreadyOnline = Array.from(onlineUsers.values()).includes(username);
+
+    if (!isAlreadyOnline) {
+      onlineUsers.set(socket.id, username);
+      io.emit("onlineUsers", Array.from(onlineUsers.values()));
+    }
+  })
+
 
   // User joins a chat channel
   socket.on("joinChannel", (channelName) => {
@@ -58,6 +69,8 @@ io.on("connection", (socket) => {
 
   // Handle user disconnect
   socket.on("disconnect", () => {
+    onlineUsers.delete(socket.id);
+    io.emit("onlineUsers", Array.from(onlineUsers.values()));
     console.log(`User disconnected: ${socket.id}`);
   });
 });
@@ -392,5 +405,15 @@ app.post("/api/readMessages/:channelName", authenticateToken, async (req, res) =
   }
 });
 
+
+app.get("/api/getAllUsers", authenticateToken, async (req,res) => {
+  try{
+    const users = await pool.query("SELECT username, full_name FROM users");
+    res.status(200).json(users.rows);
+  }catch(err){
+    console.error("Error fetching read messages:", err);
+    res.status(500).json({ error: "Failed to retrieve messages" });
+  }
+})
 
 server.listen(5000, () => console.log("Auth Server running on port 5000"));

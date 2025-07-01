@@ -4,12 +4,31 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Message from './Message'
 import { io } from "socket.io-client";
-import { fetchAllMessagesForChannel, saveMessage, updateChannelReads } from '@/utils/database'
+import { fetchAllMessagesForChannel, getAllUsers, saveMessage, updateChannelReads } from '@/utils/database'
 import FormattedDate from './FormattedDate'
 import NewMessage from './NewMessage'
 import ScrollDownArrow from './ScrollDownArrow'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import User from './User'
 
-const socket = io("http://localhost:5000");
+
+
+
+
+
+
+
+
+
+
+
 
 const formatTime = (timestamp: string): string => {
   const date = new Date(timestamp);
@@ -22,7 +41,6 @@ const formatTime = (timestamp: string): string => {
 
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 };
-
 function formatDate(timestamp: string): string {
   const date = new Date(timestamp);
   const now = new Date();
@@ -56,23 +74,25 @@ function formatDate(timestamp: string): string {
 
 
 
+interface user{
+  username:string;
+  full_name:string;
+  active?:boolean;
+}
 
 
-
-const MessageScreen = ({activeChannel, currentUser}:any) => {
+const MessageScreen = ({activeChannel, currentUser, socket}:any) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [username, setUsername] = useState(currentUser.username);
   const [shouldScrollToNewMessage, setShouldScrollToNewMessage] = useState(false);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const newMessageRef = useRef<HTMLDivElement | null>(null);
-
+  const [onlineUsers, setOnlineUsers] = useState<string[] | null>([]);
+  const [allUsers, setAllUsers] = useState<user[] | null>([]);
 
 
   let lastRenderedDate: string | null = null;
-
-  // fetch messages from dataabase and display them
-  
 
     // Handle "Enter" key press
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -175,12 +195,54 @@ const MessageScreen = ({activeChannel, currentUser}:any) => {
       scrollToBottom();
     }
   }, [messages]);
+
+
+  //tracking the number of online users
+  useEffect(() => {
+    //fetch all users
+    (async() => {
+      const users = await getAllUsers();
+      setAllUsers(users);
+    })();
+    
+    // Connect and identify the user
+    socket.emit("userOnline", currentUser.username); // or currentUser.id if you prefer
+  
+    // Listen for the updated list of online users
+    socket.on("onlineUsers", (users: string[]) => {
+      setOnlineUsers(users);
+    });
+
+  
+    // Clean up on unmount
+    return () => {
+      socket.off("onlineUsers");
+    };
+  }, []);
+
+
+
+
+
+
   return (
     <div className="flex flex-col flex-1 justify-between overflow-hidden">
       {/* Message Display (Takes Full Height) */}
         <div className='p-5 border-b-2 border-slate-300'>
           <h1 className='text-2xl font-bold'>{activeChannel.channelName}</h1>
-          <p className='text-base text-slate-600'>3 members online</p>
+          <Sheet>
+            <SheetTrigger> <p className='text-base text-slate-600'>{onlineUsers?.length} members online <span className="h-3 w-3 rounded-full bg-green-500 inline-block" /></p></SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle>All users</SheetTitle>
+                <div>
+                  {allUsers?.map((user)=> {
+                    return <User username={user.username} full_name={user.full_name} active={onlineUsers?.includes(user.username) || false} key={user.username}/>
+                  })}
+                </div>
+              </SheetHeader>
+            </SheetContent>
+          </Sheet>
         </div>
         <div className="flex-col flex-1 border-b-2 border-slate-300 mt-5 p-2 gap-4 overflow-y-scroll" ref={messageListRef}>
           {messages.map((message, index) => {
