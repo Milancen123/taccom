@@ -1,3 +1,4 @@
+"use client"
 import React, { memo } from "react";
 import FormattedDate from "./FormattedDate";
 import Message from "./Message";
