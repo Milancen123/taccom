@@ -71,7 +71,6 @@ const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
         channels.map((channel, index) => (
           <SidebarItem
           name = {channel.channelName}
-          messages = {channel.messages}
           active={activeChannel.channelName === channel.channelName}
           onClick={()=>setChannel(channel)}
           key = {index}
