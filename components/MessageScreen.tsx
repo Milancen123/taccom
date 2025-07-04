@@ -82,7 +82,7 @@ interface user{
 }
 
 
-const MessageScreen = ({activeChannel, currentUser, socket}:any) => {
+const MessageScreen = ({activeChannel, currentUser, socket, setUnreadCounts}:any) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [username, setUsername] = useState(currentUser.username);
@@ -149,7 +149,13 @@ const MessageScreen = ({activeChannel, currentUser, socket}:any) => {
         ...newMessage,
         newMessage: true,
       };
-      if(newMessage.channelName === activeChannel.channelName) setMessages((prev) => [...prev, formattedMessage]);
+      if(newMessage.channelName === activeChannel.channelName) {
+        setMessages((prev) => [...prev, formattedMessage])
+      }else{
+        console.log("Setujemo sada");
+        setUnreadCounts(newMessage.channelName);
+      }
+
     });
 
     return () => {

@@ -20,6 +20,8 @@ export default function Home() {
     url_path: "commandcenter",
   });
 
+  const [unreadCounts, setUnreadCounts] = useState<{ [channelName: string]: number }>({});
+
 
 
 
@@ -55,10 +57,29 @@ export default function Home() {
 
         {/* Main content area fills remaining height */}
         <div className="flex flex-1 w-full overflow-hidden">
-          <Sidebar activeChannel={activeChannel} setActiveChannel={setActiveChannel} />
+          <Sidebar 
+          activeChannel={activeChannel} 
+          setActiveChannel={setActiveChannel}
+          currentUser={user}
+          unreadCount={unreadCounts}
+          setUnreadCounts={setUnreadCounts}
+          />
 
           {/* MessageScreen handles its own layout inside */}
-          <MessageScreen activeChannel={activeChannel} currentUser={user} socket={socket} />
+          <MessageScreen 
+          activeChannel={activeChannel} 
+          currentUser={user} 
+          socket={socket}
+          setUnreadCounts={(channelName:string)=>{
+            if(!channelName) channelName = "Command Center";
+             setUnreadCounts(prev => ({
+              ...prev,
+              [channelName]: (prev[channelName] || 0) + 1,
+            }));
+          }}
+
+
+          />
         </div>
       </div>
     </SignedIn>

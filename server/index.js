@@ -84,7 +84,8 @@ io.on("connection", (socket) => {
     chatRooms[channelName].push(chatMessage);
 
     // Broadcast only to users in the same channel
-    io.to(channelName).emit("receiveMessage", chatMessage);
+    //io.to(channelName).emit("receiveMessage", chatMessage);
+    io.emit("receiveMessage", chatMessage);
   });
 
   // Handle user disconnect

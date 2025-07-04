@@ -17,7 +17,7 @@ interface Channel{
   messages:number;
 }
 
-const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
+const Sidebar = ({activeChannel, setActiveChannel, currentUser, unreadCount, setUnreadCounts}:any) => {
   // setting the channels, and the numb of unread messages for currentUser
   const [channels, setChannels] = useState<Channel[] | null>(null);
 
@@ -26,7 +26,6 @@ const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
     (async()=> {
       const response = await getChannels();
       setChannels(response);
-
     })();
     
   }, [])
@@ -36,10 +35,17 @@ const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
     (async()=> {
       const response = await getChannels();
       setChannels(response);
-
+      console.log(channels);
     })();
+
+    setUnreadCounts((prev: any) => ({
+      ...prev,
+      [activeChannel.channelName]: 0,
+    }));
     
   }, [activeChannel])
+
+
 
 
   //! Make the current user data here, based on the JWT credential
@@ -57,22 +63,34 @@ const Sidebar = ({activeChannel, setActiveChannel, currentUser}:any) => {
     setActiveChannel(channel);
     
     //update current
-    // (async()=> {
-    //   await updateChannelReads(channel.channelName)
-    // })();
+    (async()=> {
+      await updateChannelReads(activeChannel.channelName)
+    })();
 
   
     //! maybe dont update channel reads for the newly current channel
 
   }
+
+
+
   return (
     <div className='w-[20%] h-full overflow-hidden border-r-2 border-gray-200 p-2'>
       {
         channels.map((channel, index) => (
           <SidebarItem
           name = {channel.channelName}
+          messages={(Number(unreadCount[channel.channelName]) + Number(channel["messages"])) || Number(channel["messages"])}
           active={activeChannel.channelName === channel.channelName}
-          onClick={()=>setChannel(channel)}
+          onClick={()=>{
+            //! resetujemo unreadCount za taj kanal na 0          
+            setChannel(channel)
+            setUnreadCounts((prev: any) => ({
+              ...prev,
+              [activeChannel.channelName]: 0,
+            }));
+          
+          }}
           key = {index}
           />
         ))
