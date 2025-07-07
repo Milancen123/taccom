@@ -1,0 +1,775 @@
+-----------------------------------sendPublicKeyToServer.ts--------------------------------------------
+
+import axios from "axios";
+
+export const savePublicKeyToServer = async (publicKey: string): Promise<any | null> => {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    console.log("saljemo zahtev za javni kljuc na server: ", publicKey);
+    try {
+      const res = await axios.post(
+        `http://localhost:5000/api/savePublicKey`,
+        { publicKey }, // this is the POST body
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+      return res.data;
+    } catch (err) {
+      console.error("Failed to save publicKey", err);
+      return null;
+    }
+  };
+
+
+
+
+
+-------------------------sendEncryptedKeysToServer.ts--------------------------------------
+
+import axios from "axios";
+
+interface EncryptedAESKey {
+  user_id: string;
+  encrypted_channel_key: string;
+}
+
+export const sendEncryptedKeysToServer = async (encryptedKeys: EncryptedAESKey[]) => {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    try {
+        const response = await axios.put(
+        "http://localhost:5000/api/updateEncryptedKeys", 
+        {
+            keys: encryptedKeys,
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            }
+        }
+        );
+
+        console.log("Keys updated successfully:", response.data);
+    } catch (error) {
+        console.error("Failed to update encrypted keys:", error);
+    }
+}
+
+
+
+
+-------------------------keyStorage.ts-------------------------------
+// utils/db.ts
+import { openDB } from "idb";
+
+const DB_NAME = "SecureKeysDB";
+const STORE_NAME = "keys";
+
+export async function getDB() {
+  return openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "username" });
+      }
+    },
+  });
+}
+
+export async function storeEncryptedPrivateKey({
+  username,
+  ciphertext,
+  salt,
+  iv,
+}: {
+  username: string; // usually user's ID or username
+  ciphertext: string;
+  salt: string;
+  iv: string;
+}) {
+  const db = await getDB();
+  await db.put(STORE_NAME, {
+    username,
+    ciphertext,
+    salt,
+    iv,
+  });
+}
+
+export async function getEncryptedPrivateKey(username: string) {
+  const db = await getDB();
+  return await db.get(STORE_NAME, username);
+}
+
+export async function deleteEncryptedPrivateKey(username: string) {
+  const db = await getDB();
+  await db.delete(STORE_NAME, username);
+}
+
+
+interface AESKeyRecord {
+  id: string; // fixed ID like "aesKey"
+  encryptedKey: string; // base64 or stringified key
+}
+
+export async function storeAESKey(encryptedKey: string): Promise<void> {
+  const db = await openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+    },
+  });
+
+  const record: AESKeyRecord = {
+    id: "aesKey",
+    encryptedKey,
+  };
+
+  await db.put(STORE_NAME, record);
+  console.log("AES key stored successfully in IndexedDB.");
+}
+
+
+export async function getAESKey(): Promise<string | null> {
+  const db = await openDB(DB_NAME, 1);
+
+  const record = await db.get(STORE_NAME, "aesKey");
+
+  if (!record) {
+    console.warn("No AES key found in IndexedDB.");
+    return null;
+  }
+
+  return record.encryptedKey; // this is your base64 or stringified encrypted AES key
+}
+
+
+
+
+-----------------------------keys.ts-----------------------------
+export async function generateRSAKeyPair(): Promise<{
+  publicKey: CryptoKey;
+  privateKey: CryptoKey;
+}> {
+  const keyPair = await window.crypto.subtle.generateKey(
+    {
+      name: "RSA-OAEP",
+      modulusLength: 2048, // good balance between security and performance
+      publicExponent: new Uint8Array([1, 0, 1]), // 65537
+      hash: "SHA-256",
+    },
+    true, // extractable (so we can export later)
+    ["encrypt", "decrypt"]
+  );
+
+  return {
+    publicKey: keyPair.publicKey,
+    privateKey: keyPair.privateKey,
+  };
+}
+
+
+
+// Export public key as base64-encoded string
+export async function exportPublicKey(publicKey: CryptoKey): Promise<string> {
+  const spki = await window.crypto.subtle.exportKey("spki", publicKey);
+  return bufferToBase64(spki);
+}
+
+// Export private key (to be encrypted before storing)
+export async function exportPrivateKey(privateKey: CryptoKey): Promise<ArrayBuffer> {
+  return await window.crypto.subtle.exportKey("pkcs8", privateKey);
+}
+
+export async function importPublicKey(base64Key: string): Promise<CryptoKey> {
+  const keyBuffer = base64ToBuffer(base64Key);
+
+  return crypto.subtle.importKey(
+    "spki",                  // format
+    keyBuffer,               // key data
+    {
+      name: "RSA-OAEP",      // algorithm used for encryption/decryption
+      hash: "SHA-256",       // must match your usage
+    },
+    true,                    // extractable
+    ["encrypt"]              // key usages
+  );
+}
+
+// Utility function: ArrayBuffer → Base64
+export function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return window.btoa(binary);
+}
+
+// Utility function: Base64 → ArrayBuffer
+export function base64ToBuffer(base64: string): ArrayBuffer {
+  const binary = window.atob(base64);
+  const buffer = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    buffer[i] = binary.charCodeAt(i);
+  }
+  return buffer.buffer;
+}
+
+
+
+
+
+
+
+
+
+
+--------------------fetchPublicKeys.ts----------------------------
+
+import axios from "axios";
+
+interface userPublicKeys {
+    user_id: string;
+    public_key:string;
+}
+
+export const fetchPublicKeys = async (): Promise<userPublicKeys[] | null> => {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+  
+    try {
+      const res = await axios.get(
+        `http://localhost:5000/api/getPublicKeys`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+      return res.data;
+    } catch (err) {
+      console.error("Failed to save publicKey", err);
+      return null;
+    }
+  };
+
+
+-----------------------------fetchEncryptedAESchannel------------------------------------
+
+import axios from "axios";
+
+
+
+export const fetchEncryptedAESchannelKey = async (): Promise<any | null> => {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+
+    try {
+      const res = await axios.get(
+        `http://localhost:5000/api/getEncryptedAESchannelKey`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+      console.log("OVO DOBIJAMO OD API ENDPOINTA: ", res.data);
+      return res.data;
+    } catch (err) {
+      console.error("Failed to save publicKey", err);
+      return null;
+    }
+  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--------------------------------encryptPrivateKey.ts--------------------------------------------
+import { base64ToBuffer, bufferToBase64 } from "./keys";
+
+export async function encryptPrivateKey(
+  privateKey: ArrayBuffer,
+  password: string
+): Promise<{
+  ciphertext: string;
+  salt: string;
+  iv: string;
+}> {
+  // 1. Generate random salt & IV
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // 2. Derive AES key from password using PBKDF2
+  const keyMaterial = await getKeyMaterial(password);
+  const aesKey = await deriveAESKey(keyMaterial, salt);
+
+  // 3. Encrypt the private key
+  const encrypted = await crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv,
+    },
+    aesKey,
+    privateKey
+  );
+
+  return {
+    ciphertext: bufferToBase64(encrypted),
+    salt: bufferToBase64(salt.buffer),
+    iv: bufferToBase64(iv.buffer),
+  };
+}
+
+async function getKeyMaterial(password: string): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  return await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits", "deriveKey"]
+  );
+}
+
+async function deriveAESKey(
+  keyMaterial: CryptoKey,
+  salt: Uint8Array
+): Promise<CryptoKey> {
+  return await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 100_000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    {
+      name: "AES-GCM",
+      length: 256,
+    },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---------------------------------------decryptPrivateKey.ts---------------------------------------------------
+import { base64ToBuffer } from "./keys";
+
+export async function decryptPrivateKeyFromStorage(
+  encryptedBase64: string,
+  password: string,
+  saltBase64: string,
+  ivBase64: string
+): Promise<CryptoKey> {
+
+
+    
+  const encryptedBuffer = base64ToBuffer(encryptedBase64);
+  const salt = base64ToBuffer(saltBase64);
+  const iv = base64ToBuffer(ivBase64);
+
+  // Step 1: Derive AES key from password using PBKDF2
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  const aesKey = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+
+  // Step 2: Decrypt the encrypted private key
+  const decryptedPrivateKey = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    encryptedBuffer
+  );
+
+  // Step 3: Import the decrypted key into usable CryptoKey
+  return await crypto.subtle.importKey(
+    "pkcs8",
+    decryptedPrivateKey,
+    {
+      name: "RSA-OAEP",
+      hash: "SHA-256",
+    },
+    true,
+    ["decrypt"]
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-----------------------------------------AES.ts-----------------------------------------------------
+
+import { decryptPrivateKeyFromStorage } from "./decryptPrivateKey";
+import { base64ToBuffer, bufferToBase64 } from "./keys";
+
+export async function generateAESKey(): Promise<CryptoKey> {
+  return await window.crypto.subtle.generateKey(
+    {
+      name: "AES-GCM",
+      length: 256, // 256-bit key
+    },
+    true, // extractable (set to false if you don’t want to export it)
+    ["encrypt", "decrypt"]
+  );
+}
+
+
+export async function exportAESKey(key: CryptoKey): Promise<string> {
+  const rawKey = await window.crypto.subtle.exportKey("raw", key);
+  return bufferToBase64(rawKey);
+}
+
+export async function importAESKey(base64Key: string): Promise<CryptoKey> {
+  const raw = base64ToBuffer(base64Key);
+  return await window.crypto.subtle.importKey(
+    "raw",
+    raw,
+    { name: "AES-GCM" },
+    true,
+    ["encrypt", "decrypt"]
+  );
+}
+
+
+
+
+export async function encryptAESKeyWithPublicKey(
+  aesKey: CryptoKey,
+  publicKey: CryptoKey
+): Promise<string> {
+  // Export raw AES key
+  const rawAESKey = await crypto.subtle.exportKey("raw", aesKey); // ArrayBuffer
+
+  // Encrypt AES key with recipient's RSA public key
+  const encryptedAESKey = await crypto.subtle.encrypt(
+    {
+      name: "RSA-OAEP",
+    },
+    publicKey,
+    rawAESKey // What we’re encrypting
+  );
+
+  // Convert to base64 for storage or sending
+  return bufferToBase64(encryptedAESKey);
+}
+
+
+
+
+export async function decryptAESKey(
+  decryptedPrivateKey: CryptoKey,
+  encryptedAESKey: ArrayBuffer | Uint8Array
+): Promise<CryptoKey> {
+  // 🔐 Ensure you're passing a valid BufferSource (Uint8Array)
+  const encryptedBuffer =
+    encryptedAESKey instanceof Uint8Array
+      ? encryptedAESKey
+      : new Uint8Array(encryptedAESKey); // convert ArrayBuffer to Uint8Array
+
+  // 🧩 Decrypt the AES key
+  const rawAESKey = await crypto.subtle.decrypt(
+    {
+      name: "RSA-OAEP",
+    },
+    decryptedPrivateKey,
+    encryptedBuffer
+  );
+
+  // 🔐 Import usable AES CryptoKey
+  const aesKey = await crypto.subtle.importKey(
+    "raw",
+    rawAESKey,
+    { name: "AES-GCM" },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  return aesKey;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------EncryptionProvider.tsx-------------------------------------------------------
+"use client";
+import React, { createContext, useContext, useEffect, useState } from "react";
+
+import { getAESKey, getEncryptedPrivateKey, storeEncryptedPrivateKey } from "@/e2ee/keyStorage";
+import { decryptAESKey, encryptAESKeyWithPublicKey, generateAESKey, importAESKey } from "@/e2ee/AES";
+import { fetchPublicKeys } from "@/e2ee/fetchPublicKeys";
+import { base64ToBuffer, exportPrivateKey, exportPublicKey, generateRSAKeyPair, importPublicKey } from "@/e2ee/keys";
+import { sendEncryptedKeysToServer } from "@/e2ee/sendEncryptedKeysToServer";
+import { decryptPrivateKeyFromStorage } from "@/e2ee/decryptPrivateKey";
+import { encryptPrivateKey } from "@/e2ee/encryptPrivateKey";
+import { savePublicKeyToServer } from "@/e2ee/sendPublicKeyToServer";
+import { fetchEncryptedAESchannelKey } from "@/e2ee/fetchEncryptedAESchannelKey";
+
+
+
+interface EncryptionContextType {
+decryptedPrivateKey: CryptoKey | null;
+aesKey: CryptoKey | null;
+encryptMessage: (message: string) => Promise<any>;
+decryptMessage: (ciphertext: string) => Promise<any>;
+isReady: boolean;
+}
+
+interface userPublicKeys {
+    user_id: string;
+    public_key:string;
+}
+
+interface encryptedAESkeys {
+    user_id: string;
+    encrypted_channel_key:string;
+}
+
+
+const EncryptionContext = createContext<EncryptionContextType | undefined>(undefined);
+
+
+export const EncryptionProvider = ({ children, currentUser }: { children: React.ReactNode, currentUser:any}) => {
+
+
+const [decryptedPrivateKey, setDecryptedPrivateKey] = useState<CryptoKey | null>(null);
+const [username, setUsername] = useState(currentUser.username);
+const [aesKey, setAESKey] = useState<CryptoKey | null>(null);
+const [isReady, setIsReady] = useState(false);
+
+
+useEffect(() => {
+    (async () => {
+        try {
+            const encrypted = await getEncryptedPrivateKey(username);
+            console.log(encrypted);
+            let password;
+            let privateKey;
+            if(!encrypted) {
+                //generate a key pair, and save a private key in the indexeddb and public key to the server database
+                const keyPair = await generateRSAKeyPair();
+                const exportedPrivateKey = await exportPrivateKey(keyPair.privateKey);
+                const exportedPublicKey = await exportPublicKey(keyPair.publicKey);
+                password = prompt("Enter your password to generate a private key:")!;
+                const {ciphertext, salt, iv} = await encryptPrivateKey(exportedPrivateKey, password);
+
+                //save to indexdb
+                await storeEncryptedPrivateKey({username:username, ciphertext:ciphertext, salt:salt, iv:iv});
+                //store public key to database
+                await savePublicKeyToServer(exportedPublicKey);
+
+            }else{
+                password = prompt("Enter your password to unlock private key:")!;
+                privateKey = await decryptPrivateKeyFromStorage(encrypted.ciphertext, password, encrypted.salt, encrypted.iv);
+                setDecryptedPrivateKey(privateKey);
+            }
+
+            //if(!privateKey) return;
+
+
+            if(username === "admin"){
+                const AESkey = await getAESKey();
+                if(AESkey){
+                    //update all users with the aes key in case someone lost it or somthing else happenede, refresh their aes key
+                    const decryptedAESkey = await decryptAESKey(privateKey, base64ToBuffer(AESkey));
+
+                    const all_users_public_keys:userPublicKeys[] | null = await fetchPublicKeys(); // {user_id, public_key}
+                    console.log(all_users_public_keys);
+                    console.log("ovo iznad su javni kljucevi");
+                    if(!all_users_public_keys) return;
+
+                    //encrypt AES key with each user public key
+                    const encrypted_AES_keys:encryptedAESkeys[] = await Promise.all(
+                        all_users_public_keys.map(async (user) => {
+                        const publicKey = await importPublicKey(user.public_key);
+                        const encrypted = await encryptAESKeyWithPublicKey(decryptedAESkey, publicKey);
+
+                        return {
+                            user_id: user.user_id,
+                            encrypted_channel_key: encrypted
+                        };
+                    }));
+
+
+                    await sendEncryptedKeysToServer(encrypted_AES_keys);
+
+
+                }else{
+                    //generate AES key
+                    const AES_key:CryptoKey = await generateAESKey();
+                    console.log("OVDE SMO SADA!");
+                    //fetch all users public keys
+                    const all_users_public_keys:userPublicKeys[] | null = await fetchPublicKeys(); // {user_id, public_key}
+                    console.log(all_users_public_keys);
+                    console.log("ovo iznad su javni kljucevi");
+                    if(!all_users_public_keys) return;
+
+                    //encrypt AES key with each user public key
+                    const encrypted_AES_keys:encryptedAESkeys[] = await Promise.all(
+                        all_users_public_keys.map(async (user) => {
+                        const publicKey = await importPublicKey(user.public_key);
+                        const encrypted = await encryptAESKeyWithPublicKey(AES_key, publicKey);
+
+                        return {
+                            user_id: user.user_id,
+                            encrypted_channel_key: encrypted
+                        };
+                    }));
+
+                    //update database with encrypted aes key
+                    await sendEncryptedKeysToServer(encrypted_AES_keys);
+                }
+            }else{
+                const fetchedEncryptedAESchannelKey = await fetchEncryptedAESchannelKey();
+                if(fetchedEncryptedAESchannelKey){
+                    const base64 = fetchedEncryptedAESchannelKey[0].encrypted_channel_key.trim();
+                    console.log("Base64: ", base64);
+                    if (!(decryptedPrivateKey instanceof CryptoKey)) {
+                      throw new Error("Invalid private key: not a CryptoKey");
+                    }
+                    const decryptedAESkey = await decryptAESKey(privateKey, base64ToBuffer(base64));
+                    setAESKey(decryptedAESkey);
+                }
+            }
+
+
+            setIsReady(true);
+        } catch (err) {
+            console.error("Encryption context init failed:", err);
+        }
+})();
+
+}, []);
+
+const encryptMessage = async (message: string): Promise<any> => {
+    if (!aesKey) throw new Error("AES key not ready");
+    const enc = new TextEncoder();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    enc.encode(message)
+    );
+
+    return JSON.stringify({
+    iv: Array.from(iv),
+    ciphertext: Array.from(new Uint8Array(encrypted))
+    });
+
+};
+const decryptMessage = async (ciphertext: string): Promise<any> => {
+if (!aesKey) throw new Error("AES key not ready");
+const { iv, ciphertext: data } = JSON.parse(ciphertext);
+const dec = new TextDecoder();
+const decrypted = await crypto.subtle.decrypt(
+  { name: "AES-GCM", iv: new Uint8Array(iv) },
+  aesKey,
+  new Uint8Array(data)
+);
+
+return dec.decode(decrypted);
+
+};
+
+
+return (
+<EncryptionContext.Provider value={{ decryptedPrivateKey, aesKey, encryptMessage, decryptMessage, isReady }}>
+{children}
+</EncryptionContext.Provider>
+);
+};
+
+
+
+export const useEncryption = (): EncryptionContextType => {
+const context = useContext(EncryptionContext);
+if (!context) throw new Error("useEncryption must be used within EncryptionProvider");
+return context;
+};

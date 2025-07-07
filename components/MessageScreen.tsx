@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sheet"
 import User from './User'
 import MessageList from './MessageList'
+import { useEncryption } from '@/context/EncryptionProvider'
 
 
 
@@ -83,6 +84,9 @@ interface user{
 
 
 const MessageScreen = ({activeChannel, currentUser, socket, setUnreadCounts}:any) => {
+  const {encryptMessage, decryptMessage, isReady, aesKey} = useEncryption();
+
+
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [username, setUsername] = useState(currentUser.username);
@@ -112,20 +116,24 @@ const MessageScreen = ({activeChannel, currentUser, socket, setUnreadCounts}:any
 
   
   const sendMessage = () => {
-    if (message.trim()) {
-      const timestamp = new Date().toISOString(); // Get current date & time in ISO format
-      const messageData = { channelName: activeChannel.channelName, message, sender: username, timestamp };
-      console.log(messageData);
-      setMessage("");
-      socket.emit("sendMessage", messageData);
-      (async () => {
-        await saveMessage(activeChannel.channelName, message);
-        await updateChannelReads(activeChannel.channelName);
-      })();
+    (async()=>{
+      if (message.trim()) {
+        const timestamp = new Date().toISOString(); // Get current date & time in ISO format
+        const encryptedPayload = await encryptMessage(message);
 
-      setMessage(""); // Clear input
-      setTimeout(scrollToBottom, 100); // Ensure DOM update before scroll
-    }
+        const messageData = { channelName: activeChannel.channelName, message:encryptedPayload, sender: username, timestamp };
+        console.log(messageData);
+        setMessage("");
+        socket.emit("sendMessage", messageData);
+
+        await saveMessage(activeChannel.channelName, encryptedPayload);
+        await updateChannelReads(activeChannel.channelName);
+
+        setMessage(""); // Clear input
+        setTimeout(scrollToBottom, 100); // Ensure DOM update before scroll
+      }
+    })();
+
   };
 
 
@@ -145,24 +153,29 @@ const MessageScreen = ({activeChannel, currentUser, socket, setUnreadCounts}:any
     
     // Listen for new messages
     socket.on("receiveMessage", (newMessage) => {
-      const formattedMessage = {
+
+      (async()=>{
+        const decrypted = await decryptMessage(newMessage.message);
+        newMessage.message = decrypted;
+        const formattedMessage = {
         ...newMessage,
         newMessage: true,
-      };
-      if(newMessage.channelName === activeChannel.channelName) {
-        setMessages((prev) => [...prev, formattedMessage])
-      }else{
-        console.log("Setujemo sada");
-        setUnreadCounts(newMessage.channelName);
-      }
+        };
+        if(newMessage.channelName === activeChannel.channelName) {
+          setMessages((prev) => [...prev, formattedMessage])
+        }else{
+          console.log("Setujemo sada");
+          setUnreadCounts(newMessage.channelName);
+        }
 
+      })();
     });
 
     return () => {
       socket.off("receiveMessage");
       socket.off("chatHistory");
     };
-  }, [activeChannel]); // Re-run when channel changes
+  }, [activeChannel, aesKey]); // Re-run when channel changes
 
   let newMessages =false;
 
@@ -174,10 +187,21 @@ const MessageScreen = ({activeChannel, currentUser, socket, setUnreadCounts}:any
       //await updateChannelReads(activeChannel.channelName);
       
       const msgs = await fetchAllMessagesForChannel(activeChannel.channelName);
-      setMessages(msgs);
+      //decrypt all messages first and then set them
+      if(!isReady) return;
+      const decryptedMSGS = await Promise.all(msgs.map(async (message:any) => {
+        const decrypted = await decryptMessage(message.content);
+        console.log(decrypted);
+        message.content = decrypted;
+        return {
+          ...message
+        }
+      }));
+      
+      setMessages(decryptedMSGS);
 
       const hasNew = msgs.some(
-        (msg) => msg.newMessage && msg.username !== currentUser.username && msg.sender !== currentUser.username
+        (decryptedMSGS) => decryptedMSGS.newMessage && decryptedMSGS.username !== currentUser.username && decryptedMSGS.sender !== currentUser.username
       );
   
       if (hasNew) {
@@ -187,7 +211,7 @@ const MessageScreen = ({activeChannel, currentUser, socket, setUnreadCounts}:any
 
       }
     })();
-  }, [activeChannel])
+  }, [activeChannel, isReady])
 
   useEffect(() => {
     if (shouldScrollToNewMessage && newMessageRef.current) {

@@ -52,7 +52,7 @@ export default function Home() {
   
   return (
     <SignedIn>
-      <EncryptionProvider currentUser={user}>
+      <EncryptionProvider currentUser={user} socket={socket}>
         <div className="flex flex-col h-screen w-screen overflow-hidden">
           {/* Navbar stays at the top */}
           <Navbar currentUser={user} socket={socket} />

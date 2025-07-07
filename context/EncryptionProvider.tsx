@@ -10,6 +10,7 @@ import { decryptPrivateKeyFromStorage } from "@/e2ee/decryptPrivateKey";
 import { encryptPrivateKey } from "@/e2ee/encryptPrivateKey";
 import { savePublicKeyToServer } from "@/e2ee/sendPublicKeyToServer";
 import { fetchEncryptedAESchannelKey } from "@/e2ee/fetchEncryptedAESchannelKey";
+import router, { useRouter } from "next/navigation";
 
 
 
@@ -35,8 +36,8 @@ interface encryptedAESkeys {
 const EncryptionContext = createContext<EncryptionContextType | undefined>(undefined);
 
 
-export const EncryptionProvider = ({ children, currentUser }: { children: React.ReactNode, currentUser:any}) => {
-
+export const EncryptionProvider = ({ children, currentUser, socket }: { children: React.ReactNode, currentUser:any, socket:any}) => {
+const router = useRouter();
 const effectRan = useRef(false);
 const [decryptedPrivateKey, setDecryptedPrivateKey] = useState<CryptoKey | null>(null);
 const [username, setUsername] = useState(currentUser.username);
@@ -102,6 +103,7 @@ useEffect(() => {
                         
                         decryptedAESkey = await decryptAESKey(privateKey, base64ToBuffer(AESkey[0].encrypted_channel_key));
                         console.log("dekriptovali smo ga"); 
+                        setAESKey(decryptedAESkey);
                     }catch(err){
                         console.error("Failed to decrypt AES key: ", err);
                     }
@@ -129,6 +131,7 @@ useEffect(() => {
                 }else{
                     //generate AES key
                     const AES_key:CryptoKey = await generateAESKey();
+                    setAESKey(AES_key);
                     console.log("OVDE SMO SADA!");
                     //fetch all users public keys
                     const all_users_public_keys:userPublicKeys[] | null = await fetchPublicKeys(); // {user_id, public_key}
@@ -160,17 +163,44 @@ useEffect(() => {
                     setAESKey(decryptedAESkey);
                 }else{
                     alert("ADMIN Vam mora odobriti kljuc za kanal");
+                    //logout-jte se
+                    localStorage.removeItem("token");
+                    socket.disconnect();
+                    router.push("/login");
                 }
             }
-
-
+            
             setIsReady(true);
         } catch (err) {
             console.error("Encryption context init failed:", err);
         }
 })();
+
+
+
+
     effectRan.current = true;
+
 }, []);
+
+
+
+
+// useEffect(()=>{
+//     (async() => {
+//         if(!aesKey) return;
+//             console.log("sada enkriptujem poruku sa mojim aes kljucem");
+//             let message="Ja sam Milan Nikolic zelim da je sada enkriptujem i da vidim sta cu da dobijem";
+//             let enkript= await encryptMessage(message);
+//             console.log(enkript);
+//             console.log("sada dekriptujem poruku sa tim istim kljucem i iv");
+//             let dekript = await decryptMessage(enkript);
+//             console.log(dekript);
+
+//     })();
+// }, [aesKey]);
+
+
 
 const encryptMessage = async (message: string): Promise<any> => {
     if (!aesKey) throw new Error("AES key not ready");
