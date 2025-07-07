@@ -449,4 +449,128 @@ app.get("/api/getAllUsers", authenticateToken, async (req,res) => {
   }
 })
 
+
+
+
+
+app.post("/api/savePublicKey", authenticateToken, async (req, res) => {
+  try {
+    const { publicKey } = req.body;
+    console.log("OVDE SE SADA NALAZIMO");
+    console.log("OVO JE JAVNI KLJUC: " , publicKey);
+    if (!publicKey) {
+      return res.status(400).json({ error: "Missing publicKey" });
+    }
+
+    // Get user ID from JWT
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE username = $1",
+      [req.user.username]
+    );
+
+    console.log(userResult);
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userId = userResult.rows[0].id;
+    const response1 = await pool.query("SELECT user_id FROM userpublickeys WHERE user_id=$1", [userId]);
+    console.log(response1.rows.length);
+    if(response1.rows.length === 0){
+      const response = await pool.query("INSERT INTO userpublickeys (user_id, public_key) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING", [userId, publicKey]);
+    }
+
+    res.status(200).json({success:true});
+
+  }catch(err){
+    console.log(err);
+    res.status(500).json({ error: "Failed to save publicKey" });
+  }
+
+});
+
+
+
+app.get("/api/getPublicKeys", authenticateToken, async (req, res) => {
+  try{
+    // Get user ID from JWT
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE username = $1",
+      [req.user.username]
+    );
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userId = userResult.rows[0].id;
+
+    const response = await pool.query("SELECT user_id, public_key FROM userpublickeys");
+
+    res.status(200).json(response.rows);
+
+
+  }catch(err){
+    res.status(500).json({ error: "Failed to save publicKey" });
+  }
+})
+
+
+app.put("/api/updateEncryptedKeys", authenticateToken, async (req, res) => {
+  try {
+    const { keys } = req.body;
+
+    if (!Array.isArray(keys)) {
+      return res.status(400).json({ error: "Invalid format: keys must be an array" });
+    }
+
+    for (const key of keys) {
+      const { user_id, encrypted_channel_key } = key;
+
+      await pool.query(
+        `INSERT INTO userencryptedchannelkeys (user_id, encrypted_channel_key)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) DO UPDATE SET encrypted_channel_key = EXCLUDED.encrypted_channel_key`,
+        [user_id, encrypted_channel_key]
+      );
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Error updating encrypted keys:", err);
+    return res.status(500).json({ error: "Failed to save encrypted keys" });
+  }
+});
+
+
+app.get("/api/getEncryptedAESchannelKey", authenticateToken, async (req, res) => {
+  try{
+    // Get user ID from JWT
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE username = $1",
+      [req.user.username]
+    );
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userId = userResult.rows[0].id;
+
+    const response = await pool.query("SELECT user_id, encrypted_channel_key FROM userencryptedchannelkeys WHERE user_id = $1", [userId]);
+
+    if(response.rowCount === 0) {
+      return res.status(200).json([]);
+    }
+
+    res.status(200).json(response.rows);
+
+
+  }catch(err){
+    res.status(500).json({ error: "Failed to save publicKey" });
+  }
+})
+
+
+
+
+
+
+
+
 server.listen(5000,"0.0.0.0", () => console.log("Auth Server running on port 5000"));
